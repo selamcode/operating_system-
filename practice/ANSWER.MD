@@ -211,6 +211,7 @@ which immediately runs the process that issued the I/O. How does
 this behavior differ? Why might running a process that just completed
 an I/O again be a good idea?
 
+```
 python process-run.py -l 3:0,5:100,5:100,5:100 -S SWITCH_ON_IO -c -p -I IO_RUN_IMMEDIATE
 Time        PID: 0        PID: 1        PID: 2        PID: 3           CPU           IOs
   1         RUN:io         READY         READY         READY             1          
@@ -238,6 +239,8 @@ Time        PID: 0        PID: 1        PID: 2        PID: 3           CPU      
 Stats: Total Time 21
 Stats: CPU Busy 21 (100.00%)
 Stats: IO Busy  15 (71.43%)
+
+```
 
 ``` In IO_RUN_IMMEDIATE, when an I/O completes, the process that requested the I/O immediately gets CPU time. 
 This ensures that the process can quickly continue its execution ```
