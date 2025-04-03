@@ -1,4 +1,4 @@
-// 1
+// Thread creation
 #include <stdio.h>
 #include <pthread.h>
 
