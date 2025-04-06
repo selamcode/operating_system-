@@ -115,3 +115,109 @@ void *thread_function(void *arg) {
 | `const pthread_attr_t *attr`      | Sets thread attributes (stack size, etc.)   | Usually `NULL`        |
 | `void *(*start_routine)`          | The function the thread runs                | `thread_function`     |
 | `void *arg`                       | Argument passed into the thread function    | `(void *)&some_data`  |
+
+
+
+## 2. Thread Completion with `pthread_join()`
+
+After creating a thread, you may want to wait for its completion using `pthread_join()`.
+
+### Syntax:
+
+```c
+int pthread_join(pthread_t thread, void **value_ptr);
+```
+
+### Arguments:
+
+- **`pthread_t thread`**: Specifies the thread to wait for.
+- **`void **value_ptr`**: Pointer to store the value returned by the thread. If you don't care about the return value, pass `NULL`.
+
+### Example:
+```c
+typedef struct {
+    int x;
+    int y;
+} myret_t;
+
+void *mythread(void *arg) {
+    myret_t *rvals = malloc(sizeof(myret_t));
+    rvals->x = 1;
+    rvals->y = 2;
+    return (void *) rvals;
+}
+
+int main(int argc, char *argv[]) {
+    pthread_t p;
+    myret_t *rvals;
+    myarg_t args = { 10, 20 };
+
+    pthread_create(&p, NULL, mythread, &args);
+    pthread_join(p, (void **) &rvals);
+
+    printf("returned %d %d
+", rvals->x, rvals->y);
+    free(rvals);
+    return 0;
+}
+```
+
+---
+
+## 3. Key Points
+
+- **Void Pointers**: The `start_routine` function expects and returns `void*`. This allows the function to be flexible with argument and return types, as it can handle any type of data.
+  
+- **Thread Safety**: Be careful not to return pointers to data on the stack (local variables), as they will be deallocated when the thread finishes.
+
+- **Multiple Threads**: In real-world scenarios, threads are often created and joined repeatedly. Some programs (e.g., web servers) may not require `pthread_join()` if threads are long-lived.
+
+---
+
+## 4. Thread Arguments and Return Values
+
+Sometimes, you may not need to use structures for arguments or return values. Simple types can be passed directly:
+
+### Example with a simple return type:
+```c
+void *mythread(void *arg) {
+    long long int value = (long long int) arg;
+    printf("%lld
+", value);
+    return (void *) (value + 1);
+}
+
+int main(int argc, char *argv[]) {
+    pthread_t p;
+    long long int rvalue;
+    pthread_create(&p, NULL, mythread, (void *) 100);
+    pthread_join(p, (void **) &rvalue);
+    printf("returned %lld
+", rvalue);
+    return 0;
+}
+```
+
+---
+
+## 5. Common Pitfalls
+
+- **Returning Local Variables**: Don't return pointers to variables allocated on the stack. These variables will be deallocated once the function finishes, leading to unpredictable behavior.
+
+Example of an issue:
+
+```c
+void *mythread(void *arg) {
+    myarg_t *args = (myarg_t *) arg;
+    myret_t oops; // ALLOCATED ON STACK: BAD!
+    oops.x = 1;
+    oops.y = 2;
+    return (void *) &oops; // Dangerous: `oops` will be deallocated once the thread finishes.
+}
+```
+
+---
+
+## Conclusion
+
+POSIX thread creation and management provide a simple yet powerful interface for concurrent programming. By understanding `pthread_create()` and `pthread_join()`, you can easily create and synchronize threads. However, it's crucial to handle thread arguments and return values carefully, especially regarding memory management, to avoid issues like using deallocated stack variables.
