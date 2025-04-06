@@ -221,3 +221,176 @@ void *mythread(void *arg) {
 ## Conclusion
 
 POSIX thread creation and management provide a simple yet powerful interface for concurrent programming. By understanding `pthread_create()` and `pthread_join()`, you can easily create and synchronize threads. However, it's crucial to handle thread arguments and return values carefully, especially regarding memory management, to avoid issues like using deallocated stack variables.
+
+
+# 🧵 POSIX Threads: Locks (`pthread_mutex_t`)
+
+## 🔐 Purpose of Locks
+Locks are used to ensure **mutual exclusion** when accessing **critical sections** of code—parts that should only be executed by one thread at a time. Without locks, multiple threads might read or modify shared data simultaneously, leading to **race conditions** and **data corruption**.
+
+---
+
+## 🔧 Core Lock Functions
+```c
+int pthread_mutex_lock(pthread_mutex_t *mutex);
+int pthread_mutex_unlock(pthread_mutex_t *mutex);
+```
+
+- `pthread_mutex_lock()` blocks if another thread holds the lock.
+- `pthread_mutex_unlock()` releases the lock.
+- Only the thread that **acquired** the lock should **unlock** it.
+
+---
+
+## ⚠️ Common Mistakes and Best Practices
+
+### 1. Improper Initialization
+
+All locks must be initialized **before use** to avoid undefined behavior.
+
+#### ✅ Static Initialization (at compile time)
+```c
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+```
+- Quick and easy when you know the lock is needed throughout the program.
+
+#### ✅ Dynamic Initialization (at runtime)
+```c
+int rc = pthread_mutex_init(&lock, NULL);
+assert(rc == 0);
+```
+- More flexible; useful when locks are created conditionally or within data structures.
+- The second argument is for **mutex attributes** (e.g., recursive locks). Use `NULL` for default settings.
+- **Why assert?** Ensures the mutex was properly initialized—if not, you’ll catch the issue immediately.
+
+#### 🔚 Don't forget to destroy the lock when done:
+```c
+pthread_mutex_destroy(&lock);
+```
+- Frees any resources allocated for the lock.
+- Required to avoid resource leaks, especially in long-running or multithreaded apps.
+
+---
+
+### 2. Not Checking Return Codes
+
+Library functions (including `pthread_mutex_lock()` and `pthread_mutex_unlock()`) **can fail**!
+
+#### 🛑 If you ignore return codes:
+- Errors will silently fail.
+- Multiple threads might enter the critical section.
+- You won’t know why your program behaves unpredictably.
+
+#### ✅ Use wrapper functions to simplify and enforce checks:
+```c
+void Pthread_mutex_lock(pthread_mutex_t *mutex) {
+    int rc = pthread_mutex_lock(mutex);
+    assert(rc == 0);  // Exit immediately if lock fails
+}
+```
+
+#### 🔄 For production-grade applications:
+- Don’t just `assert()`. Handle errors more gracefully (e.g., logging, retries, or cleanup).
+
+---
+
+## ⏱️ Other Lock Functions
+
+### Trylock
+```c
+int pthread_mutex_trylock(pthread_mutex_t *mutex);
+```
+- Attempts to acquire the lock **without blocking**.
+- Returns immediately with a failure code if the lock is held.
+- Useful when you want to avoid getting stuck.
+
+### Timedlock
+```c
+int pthread_mutex_timedlock(pthread_mutex_t *mutex, struct timespec *abs_timeout);
+```
+- Waits until either:
+  - The lock is acquired.
+  - The absolute timeout is reached.
+- Helpful when you want a thread to give up after a delay, such as in deadlock-prone code.
+
+> ⚠️ Avoid these unless you *really* need non-blocking behavior or timeouts.
+
+
+# 27.4 Condition Variables
+
+Condition variables in POSIX threads (pthreads) provide a mechanism for threads to wait for certain conditions to become true. They are commonly used for signaling between threads — when one thread needs to wait for another to complete some task or change a value.
+
+## Core Functions
+
+```c
+int pthread_cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex);
+int pthread_cond_signal(pthread_cond_t *cond);
+```
+
+## Usage
+
+To use a condition variable effectively, you must associate it with a mutex. The general pattern is as follows:
+
+### Thread Waiting for Condition
+
+```c
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+
+Pthread_mutex_lock(&lock);
+while (ready == 0)
+    Pthread_cond_wait(&cond, &lock);
+Pthread_mutex_unlock(&lock);
+```
+
+### Thread Signaling Condition
+
+```c
+Pthread_mutex_lock(&lock);
+ready = 1;
+Pthread_cond_signal(&cond);
+Pthread_mutex_unlock(&lock);
+```
+
+## Key Points
+
+- **Lock is required**: Always hold the lock when calling `pthread_cond_wait()` or `pthread_cond_signal()` to avoid race conditions.
+- **Automatic lock release**: `pthread_cond_wait()` releases the lock while waiting and re-acquires it before returning.
+- **Always use a `while` loop**: To avoid spurious wakeups and race conditions, use a `while` loop to recheck the condition.
+- **Avoid busy waiting**: Do not replace proper condition variable usage with a spin loop (`while (ready == 0) ;`). It wastes CPU cycles and is error-prone.
+
+## Initialization
+
+Condition variables and associated locks can be initialized statically (with `PTHREAD_COND_INITIALIZER` and `PTHREAD_MUTEX_INITIALIZER`) or dynamically with:
+
+```c
+pthread_cond_init(&cond, NULL);
+pthread_mutex_init(&lock, NULL);
+```
+
+Destroy them when no longer needed:
+
+```c
+pthread_cond_destroy(&cond);
+pthread_mutex_destroy(&lock);
+```
+
+## Compilation
+
+To compile a program using pthreads:
+
+```sh
+gcc -o main main.c -Wall -pthread
+```
+
+Make sure to include the header:
+
+```c
+#include <pthread.h>
+```
+
+## Summary
+
+Condition variables are a vital tool for correct thread synchronization. They avoid busy-waiting, handle race conditions properly, and form the basis for more advanced synchronization constructs.
+
+> Use condition variables correctly — even when it feels like overkill. It's safer and more efficient.
